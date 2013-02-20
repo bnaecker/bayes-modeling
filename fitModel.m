@@ -2,136 +2,162 @@ function ds = fitModel(ds)
 %
 % FUNCTION ds = fitModel(ds)
 %
-% The function fitModel.m fits the model assuming the requested prior type
-% to the psychophysical data in the data structure ds.
+% This function fits the model assuming the requested prior type to the
+% psychophysical discrimination data in the data structure ds.
 %
-% (c) bnaecker@stanford.edu 11 Feb 2012
+% (C) bnaecker@stanford.edu 11 Nov 2012
 
-%% Notify
-fprintf('\nRunning optimization to fit prior and likelihood.\n')
-
-%% Run on each subject
-for subject = 1:ds.info.nSubjects
+%% fit model for each subject
+for si = 1:ds.info.nSubjects
+    % notify
+    fprintf('\nFitting model for subject %d\n\n', si);
     
-    %% Notify for each subject
-    fprintf('\nSubject %d of %d\n', subject, ds.info.nSubjects);
-    
-    %% Setup indices
-    ds.info.currentSubject = subject;
+    % setup indices
+    ds.info.currentSubject = si;
     ds.info.currentBoot = 1;
     
-    %% Define all triplet conditions (refV, refC, testC) to index into
-    % choices for resampling
-    conditions = cartprod(ds.data(subject).refVels, ...
-        ds.data(subject).refContrasts, ...
-        ds.data(subject).testContrasts);
+    % define all the unique triplet conditions (refV, refC, testC). use
+    % this to index into choices during the resampling procedure
+    conditions = cartprod(ds.data(si).refVels, ...
+        ds.data(si).refContrasts, ds.data(si).testContrasts);
     
-    % Outer fitting loop (loop over bootstraps)
+    % preallocate arrays to hold output of minimization procedure, for each
+    % resampled data set
+    ds.params(si).likeHat = nan(ds.info.nUniqueContrasts, ds.info.nBoots);
+    ds.params(si).likeWidth = nan(ds.info.nUniqueContrasts, ds.info.nBoots);
+    if strcmpi(ds.flags.priorType, 'loglinear');
+        ds.params(si).slopeHat = nan(ds.info.nUniqueRefVels, ds.info.nBoots);
+        ds.llOpt(si).prsHat = nan(ds.info.nUniqueContrasts + ds.info.nUniqueRefVels, ...
+        ds.info.nBoots);
+    elseif strcmpi(ds.flags.priorType, 'gaussian');
+        ds.params(si).gamma = nan(ds.info.nBoots, 1);
+        ds.llOpt(si).prsHat = nan(ds.info.nUniqueContrasts + 1, ds.info.nBoots);
+    end
+    ds.llOpt(si).fval = nan(ds.info.nBoots, 1);
+    ds.llOpt(si).eflag = nan(ds.info.nBoots, 1);
+    
+    % outermost fitting loop, over bootstraps
     while ds.info.currentBoot <= ds.info.nBoots
         
-        %% Resampling
-        % Check that we're resampling (or just taking the true choices)
+        % resample appropriately, i.e., choices among unique conditions
         if ds.info.currentBoot > 1
             for ci = 1:size(conditions, 1)
-                % Get the current condition triplet and its index
+                % get the current condition and its indices
                 currentCondition = conditions(ci, :);
-                conditionIndices = ...
-                    ds.data(subject).refV == currentCondition(1) & ...
-                    ds.data(subject).refC == currentCondition(2) & ...
-                    ds.data(subject).testC == currentCondition(3);
+                conditionInds = ...
+                    ds.data(si).refV == currentCondition(1) & ...
+                    ds.data(si).refC == currentCondition(2) & ...
+                    ds.data(si).testC == currentCondition(3);
                 
-                % Check that there are any trials of this triplet
-                if sum(conditionIndices) > 0
-                    % Find the unique velocities from this triplet
-                    uniqueVels = unique(ds.data(subject).testV(conditionIndices));
-                    % Get the subject's choices from this triplet
-                    d = ds.data(subject).T(conditionIndices, 1);
-                    % Preallocate resample array
-                    reSample = NaN(size(d));
-                    % For each unique velocity in this triplet
+                % make sure there are trials of this condition
+                if sum(conditionInds) > 0
+                    % find unique test velocities presented for this
+                    % triplet
+                    uniqueVels = unique(ds.data(si).testV(conditionInds));
+                    
+                    % get the subject's choices for this triplet
+                    d = ds.data(si).T(conditionInds, 1);
+                    
+                    % preallocated resample array
+                    reSample = nan(size(d));
+                    
+                    % loop over unique test velocities in this triplet
                     for vi = 1:length(uniqueVels)
-                        % Find the indices of these velocities
-                        vIndices = uniqueVels(vi) == ...
-                            ds.data(subject).testV(conditionIndices);
-                        % If there is only one
-                        if sum(vIndices) == 1
-                            % Make the resample that one
-                            reSample(vIndices) = d(vIndices);
+                        
+                        % find indices of this velocity
+                        vInds = uniqueVels(vi) == ...
+                            ds.data(si).testV(conditionInds);
+                        
+                        % deal with case where there is only one of this
+                        % velocity
+                        if sum(vInds) == 1
+                            reSample(vInds) = d(vInds);
                         else
-                            % Otherwise, randomly resample the data with
-                            % replacement
-                            reSample(vIndices) = ...
-                                randsample(d(vIndices), sum(vIndices), true)';
+                            % if there are multiple, randomly resample data
+                            % with replacement
+                            reSample(vInds) = ...
+                                randsample(d(vInds), sum(vInds), true)';
                         end
                     end
-                    % Allocate the resampled data to the choice array T
-                    ds.data(subject).T(...
-                        conditionIndices, ds.info.currentBoot) = reSample;
+                    
+                    % allocate the resampled data to the full choice array
+                    ds.data(si).T(conditionInds, ds.info.currentBoot) = ...
+                        reSample;
                 end
             end
         end
         
-        %% Notify of which sample being fitted
-        fprintf('Boot %d of %d...', ds.info.currentBoot, ds.info.nBoots);
+        % notify which bootstrap is being fit currently
+        fprintf('Boot %d of %d ... ', ds.info.currentBoot, ds.info.nBoots);
         
-        %% Redefine handle to log-likelihood function
-        % this must be done since we've updated the data stucture 'ds',
-        % which is an argument to the function itself.
-        if strcmp(ds.flags.priorType, 'loglinear')
-            ds.llOpt(subject).llFun = ...
-                @(prs) (-logli_loglinear(prs, ds));
+        % redefine handle to log-likelihood function. this must be done
+        % because we have updated the data structure, and so must redefine
+        % the anonymous function handle as well.
+        if strcmpi(ds.flags.priorType, 'loglinear');
+            ds.llOpt(si).llFun = ...
+                @(prs) (-loglike_loglinear(prs, ds));
+        elseif strcmpi(ds.flags.priorType, 'gaussian');
+            ds.llOpt(si).llFun = ...
+                @(prs) (-loglike_gaussian(prs, ds));
         else
-            ds.llOpt(subject).llFun = ...
-                @(prs) (-logli_gaussian(prs, ds));
+            % optional functionality
         end
         
-        %% Run optimization
-        [ds.llOpt(subject).prsHat(:, ds.info.currentBoot) ...
-         ds.llOpt(subject).fval(ds.info.currentBoot) ...
-         ds.llOpt(subject).eflag(ds.info.currentBoot)] = ...
-            fmincon(ds.llOpt(subject).llFun, ds.llOpt(subject).prs0, ...
-            [], [], [], [], ds.llOpt(subject).LB, ds.llOpt(subject).UB, ...
-            [], ds.llOpt(subject).options);
+        % actually run the minimization
+        [ds.llOpt(si).prsHat(:, ds.info.currentBoot) ...
+         ds.llOpt(si).fval(ds.info.currentBoot) ...
+         ds.llOpt(si).eflag(ds.info.currentBoot)] = ...
+            fmincon(ds.llOpt(si).llFun, ds.llOpt(si).prs0,...
+            [], [], [], [], ds.llOpt(si).LB, ds.llOpt(si).UB, ...
+            [], ds.llOpt(si).options);
         
-        %% If the fitting converged, save appropriately
-        % Note that the data is not saved in the case that the fitting does
-        % not converge. Each users must decide what is to be done in these
-        % cases.
-        switch ds.llOpt(subject).eflag(ds.info.currentBoot)
-            case 0      % Number of iterations exceeded MaxIter or MaxFunEvals
-            case -2     % No feasible point found
-            otherwise   % Converged
-                % Notify
-                fprintf('converged @ %.2f\n', ds.llOpt(subject).fval(ds.info.currentBoot));
+        % save data, if the fitting converged. if the fitting does not
+        % converge, the user must decide what should be done. for example,
+        % one might rerun the optimization from a different starting point.
+        switch ds.llOpt(si).eflag(ds.info.currentBoot)
+            case 0
+                % number of iterations exceeded either MaxIter or
+                % MaxFunEvals
+            case -2
+                % no feasible point found
+            otherwise 
+                % notify
+                fprintf('converged @ %.2f\n', ds.llOpt(si).fval(ds.info.currentBoot));
                 
-                % Save appropriately
-                ds.params(subject).hHat(ds.info.currentBoot, :) = ...
-                    ds.llOpt(subject).prsHat(1:ds.info.nUniqueContrasts, ...
+                % save the parameters
+                ds.params(si).likeHat(:, ds.info.currentBoot) = ...
+                    ds.llOpt(si).prsHat(1:ds.info.nUniqueContrasts, ...
                     ds.info.currentBoot);
-                if strcmp(ds.flags.priorType, 'loglinear')
-                    ds.params(subject).slopeHat(ds.info.currentBoot, :) = ...
-                        ds.llOpt(subject).prsHat(ds.info.nUniqueContrasts + 1 : end, ...
+                if strcmpi(ds.flags.priorType, 'loglinear')
+                    ds.params(si).slopeHat(:, ds.info.currentBoot) = ...
+                        ds.llOpt(si).prsHat(ds.info.nUniqueContrasts + 1 : end, ...
                         ds.info.currentBoot);
+                elseif strcmpi(ds.flags.priorType, 'gaussian')
+                    ds.params(si).gamma(ds.info.currentBoot) = ...
+                        ds.llOpt(si).prsHat(end, ds.info.currentBoot);
                 else
-                    ds.params(subject).gamma(ds.info.currentBoot) = ...
-                        ds.llOpt(subject).prsHat(end, ds.info.currentBoot); 
+                    % optional functionality
                 end
                 
-                % Include g(v) if it is not being fit
-                if ds.flags.fitG
+                % must include the speed-dependence of the likelihood
+                % width, if it is not being fit
+                if ds.flags.fitLikeSpeed
+                    % optional functionality
                 else
-                    ds.params(subject).likeWidth = ds.params(subject).hHat ./ ...
-                        ds.data(subject).G;
+                    ds.params(si).likeWidth(:, ds.info.currentBoot) = ...
+                        ds.params(si).likeHat(:, ds.info.currentBoot) ./ ...
+                        ds.data(si).G;
                 end
                 
-                %% Reconstruct the prior from the fitted prior slopes
+                % reconstruct the prior from the fitted prior slopes or
+                % variances
                 ds = reconstructPrior(ds);
                 
-                %% Increment boot counter
+                % increment boot counter
                 ds.info.currentBoot = ds.info.currentBoot + 1;
         end
     end
 end
 
-%% Organize
+%% order
 ds = orderDataStruct(ds);
