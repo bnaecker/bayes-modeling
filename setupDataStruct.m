@@ -31,7 +31,18 @@ ds = struct(...
 
 %% setup the file structure and load the data
 fprintf('\nFinding files and loading data ... ');
-ds.info.baseDir = fileparts(pwd);
+
+% set paths
+oldPwd = pwd;
+cd('../../');
+ds.info.baseDir = pwd;
+addpath('Code/Fitting/');
+addpath('Code/Plotting/');
+addpath('Code/TestScripts/');
+addpath('Data/');
+cd(oldPwd)
+
+% set directory names
 ds.info.dataDir = fullfile(ds.info.baseDir, 'Data');
 if args.nSubjects == 0
     ds.info.nSubjects = 1;
@@ -46,7 +57,6 @@ if args.nSubjects == 0
             'Supported prior types are "loglinear" and "gaussian"');
     end
     ds.data(1).rawData = d.(field);
-%     ds.data.sigNse = [d.sig1 d.sig2];
     ds.info.isSimData = true;
 else
     ds.info.nSubjects = args.nSubjects;
@@ -85,11 +95,7 @@ ds.velTrans.iTransFun = ...
 ds.flags = args;
 ds.flags = rmfield(ds.flags, {'nSubjects', 'nBoots', 'nSEs'});
 ds.info.nSEs = args.nSEs;
-% if ds.info.isSimData
-%     ds.info.nBoots = 1;
-% else
-    ds.info.nBoots = args.nBoots;
-% end
+ds.info.nBoots = args.nBoots;
 
 %% define speed-dependence of likelihood widths
 if ds.flags.fitLikeSpeed

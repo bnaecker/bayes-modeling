@@ -10,7 +10,7 @@ function ds = fitModel(ds)
 %% fit model for each subject
 for si = 1:ds.info.nSubjects
     % notify
-    fprintf('\nFitting model for subject %d\n\n', si);
+    fprintf('\nFitting %s model for subject %d\n\n', ds.flags.priorType, si);
     
     % setup indices
     ds.info.currentSubject = si;

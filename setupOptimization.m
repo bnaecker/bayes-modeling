@@ -37,13 +37,13 @@ for si = 1:ds.info.nSubjects
     %% initial values for likelihood widths and prior parameters
     if strcmpi(ds.flags.priorType, 'loglinear')
         % guesses and bounds to likelihood widths
-        % [1.3850 1.3290 1.2770 1.1118 0.9209 0.8631 0.7573]'
+        % [1.3850 1.3290 1.2770 1.1118 0.9209 0.8631 0.7573]'		%% debugging an old simulation
         likeGuess =  1 .* ones(ds.info.nUniqueContrasts, 1);
         likeLB = .001 .* ones(ds.info.nUniqueContrasts, 1);
         likeUB = 100 .* ones(ds.info.nUniqueContrasts, 1);
         
         % guesses and bounds to prior slopes
-        % [6.5 8.5 9 7.9 2 0.05]'
+        % [6.5 8.5 9 7.9 2 0.05]'		%% debugging an old simulation
         priorGuess = 2 .* ones(ds.info.nUniqueRefVels, 1);
         priorLB = -100 .* ones(ds.info.nUniqueRefVels, 1);
         priorUB = 100 .* ones(ds.info.nUniqueRefVels, 1);
@@ -129,6 +129,8 @@ for si = 1:ds.info.nSubjects
                     (1 ./ sqrt(ds.likeOpt(si).R(2) .* (c .^ q ./ ...
                     (c .^ q + c50 .^ q)) + ds.likeOpt(si).R(1)));
             end
+
+			%%% I have not actually included this yet.
         end
     end
 end
