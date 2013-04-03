@@ -95,10 +95,10 @@ for si = 1:ds.info.nSubjects
         % the anonymous function handle as well.
         if strcmpi(ds.flags.priorType, 'loglinear');
             ds.llOpt(si).llFun = ...
-                @(prs) (-loglike_loglinear(prs, ds));
+                @(prs) (loglike_loglinear(prs, ds));
         elseif strcmpi(ds.flags.priorType, 'gaussian');
             ds.llOpt(si).llFun = ...
-                @(prs) (-loglike_gaussian(prs, ds));
+                @(prs) (loglike_gaussian(prs, ds));
         else
             % optional functionality
         end

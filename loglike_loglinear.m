@@ -5,7 +5,7 @@ function L = loglike_loglinear(prs, ds)
 % INPUT:    prs - guesses or updated guesses of the parameters of the
 %               locally log-linear prior model
 %
-% OUTPUT:   L - log-likelihood of the parameters given the data
+% OUTPUT:   L - negative log-likelihood of the parameters given the data
 %
 % loglike_loglinear returns the log-likelihood of the parameters in prs given
 % the psychophysical choice data in ds.data.T, under the assumption that
@@ -43,5 +43,5 @@ EPS = 1e-12;
 rho = min(max(normcdf(Z), EPS), 1 - EPS);
 
 % Compute log-likelihood
-L = sum(ds.data(si).T(:, bi) .* log(rho) + ...
+L = -sum(ds.data(si).T(:, bi) .* log(rho) + ...
     (1 - ds.data(si).T(:, bi)) .* log(1 - rho));
