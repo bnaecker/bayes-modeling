@@ -25,6 +25,7 @@ sigVals = prs(1 : ds.info.nUniqueContrasts);
 a = prs(ds.info.nUniqueContrasts + 1 : end);
 
 % Arrange the slopes of the prior at each velocity using interp1
+% this is literally rearranging, but without using indices
 refSlope = interp1(ds.data(si).refVels, a, ...
     ds.data(si).refV, 'linear');
 testSlope = interp1(ds.data(si).refVels, a, ...

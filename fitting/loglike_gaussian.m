@@ -8,7 +8,7 @@ function L = loglike_gaussian(prs, ds)
 % OUTPUT:   L = negative log-likelihood of the parameters given the data
 %
 % logli_gaussian returns the log-likelihood of the parameters in prs given
-% the psychophysical choice data in data.data.T, under the assumption that
+% the psychophysical choice data in ds.data.T, under the assumption that
 % the prior is a gaussian distribution
 %
 % (c) bnaecker@stanford.edu 11 Feb 2012

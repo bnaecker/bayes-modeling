@@ -26,8 +26,8 @@ ds = struct(...
     'params', {[]}, ...         % actual parameters returned by the optimization
     'stats', {[]}, ...          % statistics of the resampled fits
     'pmfs', {[]}, ...           % pscyhometric functions, model-predicted and fitted
-    'velTrans', {[]} ...        % info for the log-transform of the velocity domain
-    );
+    'velTrans', {[]}, ...       % info for the log-transform of the velocity domain
+	'mixInfo', {[]});			% info about the mixture of gaussians model, if needed
 
 %% setup the file structure and load the data
 fprintf('\nFinding files and loading data ... ');
@@ -36,25 +36,29 @@ fprintf('\nFinding files and loading data ... ');
 oldPwd = pwd;
 cd('../../');
 ds.info.baseDir = pwd;
-addpath('Code/Fitting/');
-addpath('Code/Plotting/');
-addpath('Code/TestScripts/');
-addpath('Data/');
+addpath('code/fitting/');
+addpath('code/plotting/');
+addpath('code/testScripts/');
+addpath('data/');
 cd(oldPwd)
 
 % set directory names
-ds.info.dataDir = fullfile(ds.info.baseDir, 'Data');
+ds.info.dataDir = fullfile(ds.info.baseDir, 'data');
 if args.nSubjects == 0
     ds.info.nSubjects = 1;
-    if strcmp(args.priorType, 'gaussian');
-        d = load(fullfile(ds.info.dataDir, 'simData_gaussian.mat'));
-        field = 'm';
-    elseif strcmp(args.priorType, 'loglinear');
-        d = load(fullfile(ds.info.dataDir, 'simData_loglinear.mat'));
-        field = 'm';
-    else
-        error('runSpeedDiscriminationModel:setupDataStruct:unknownPriorType', ...
-            'Supported prior types are "loglinear" and "gaussian"');
+	switch args.priorType
+		case 'gaussian'
+        	d = load(fullfile(ds.info.dataDir, 'simData_gaussian.mat'));
+        	field = 'm';
+		case 'loglinear'
+        	d = load(fullfile(ds.info.dataDir, 'simData_loglinear.mat'));
+        	field = 'm';
+		case 'mixture'
+			error('runSpeedDiscriminationModel:noSimulatedData', ...
+				'Sorry I haven"t coded up simulated mixture data yet');
+		otherwise
+        	error('runSpeedDiscriminationModel:setupDataStruct:unknownPriorType', ...
+            	'Supported prior types are "loglinear" and "gaussian"');
     end
     ds.data(1).rawData = d.(field);
     ds.info.isSimData = true;
@@ -83,6 +87,13 @@ ds.info.rtCol = 8;          % reaction time
 ds.info.choiceCol = 9;      % subject's choice (1 == test seen faster)
 ds.info.adaptCol = 10;      % step direction of staircase
 ds.info.correctCol = 11;    % correct choice
+
+%% save default or user-defined information about mixture of gaussians model
+if strcmp(args.priorType, 'mixture')
+	ds.mixInfo = args.mixInfo;
+else
+	ds.mixInfo = [];
+end
 
 %% setup log-transformation of velocity domain
 ds.velTrans.v0 = 0.3;

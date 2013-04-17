@@ -25,13 +25,19 @@ for si = 1:ds.info.nSubjects
     % resampled data set
     ds.params(si).likeHat = nan(ds.info.nUniqueContrasts, ds.info.nBoots);
     ds.params(si).likeWidth = nan(ds.info.nUniqueContrasts, ds.info.nBoots);
-    if strcmpi(ds.flags.priorType, 'loglinear');
-        ds.params(si).slopeHat = nan(ds.info.nUniqueRefVels, ds.info.nBoots);
-        ds.llOpt(si).prsHat = nan(ds.info.nUniqueContrasts + ds.info.nUniqueRefVels, ...
-        ds.info.nBoots);
-    elseif strcmpi(ds.flags.priorType, 'gaussian');
-        ds.params(si).gamma = nan(ds.info.nBoots, 1);
-        ds.llOpt(si).prsHat = nan(ds.info.nUniqueContrasts + 1, ds.info.nBoots);
+	switch ds.flags.priorType
+    	case 'loglinear'
+        	ds.params(si).slopeHat = nan(ds.info.nUniqueRefVels, ds.info.nBoots);
+        	ds.llOpt(si).prsHat = nan(ds.info.nUniqueContrasts + ds.info.nUniqueRefVels, ...
+        	ds.info.nBoots);
+    	case 'gaussian'
+        	ds.params(si).gamma = nan(ds.info.nBoots, 1);
+        	ds.llOpt(si).prsHat = nan(ds.info.nUniqueContrasts + 1, ds.info.nBoots);
+		case 'mixture'
+			ds.params(si).mixMean = nan(ds.mixInfo.nComponents, ds.info.nBoots);
+			ds.params(si).mixVar = nan(ds.mixInfo.nComponents, ds.info.nBoots);
+			ds.llOpt(si).prsHat = nan(ds.info.nUniqueContrasts + ...
+				2 .* ds.mixInfo.nComponents, ds.info.nBoots);
     end
     ds.llOpt(si).fval = nan(ds.info.nBoots, 1);
     ds.llOpt(si).eflag = nan(ds.info.nBoots, 1);
@@ -39,7 +45,7 @@ for si = 1:ds.info.nSubjects
     % outermost fitting loop, over bootstraps
     while ds.info.currentBoot <= ds.info.nBoots
         
-        % resample appropriately, i.e., choices among unique conditions
+        % resample appropriately, i.e., choices among unique sets of conditions
         if ds.info.currentBoot > 1
             for ci = 1:size(conditions, 1)
                 % get the current condition and its indices
@@ -93,14 +99,18 @@ for si = 1:ds.info.nSubjects
         % redefine handle to log-likelihood function. this must be done
         % because we have updated the data structure, and so must redefine
         % the anonymous function handle as well.
-        if strcmpi(ds.flags.priorType, 'loglinear');
-            ds.llOpt(si).llFun = ...
-                @(prs) (loglike_loglinear(prs, ds));
-        elseif strcmpi(ds.flags.priorType, 'gaussian');
-            ds.llOpt(si).llFun = ...
-                @(prs) (loglike_gaussian(prs, ds));
-        else
-            % optional functionality
+		switch ds.flags.priorType
+        	case 'loglinear'
+            	ds.llOpt(si).llFun = ...
+                	@(prs) (loglike_loglinear(prs, ds));
+        	case 'gaussian'
+            	ds.llOpt(si).llFun = ...
+                	@(prs) (loglike_gaussian(prs, ds));
+			case 'mixture'
+				ds.llOpt(si).llFun = ...
+					@(prs) (loglike_mixture(prs, ds));
+        	otherwise
+            	% optional functionality
         end
         
         % actually run the minimization
@@ -128,15 +138,24 @@ for si = 1:ds.info.nSubjects
                 ds.params(si).likeHat(:, ds.info.currentBoot) = ...
                     ds.llOpt(si).prsHat(1:ds.info.nUniqueContrasts, ...
                     ds.info.currentBoot);
-                if strcmpi(ds.flags.priorType, 'loglinear')
-                    ds.params(si).slopeHat(:, ds.info.currentBoot) = ...
-                        ds.llOpt(si).prsHat(ds.info.nUniqueContrasts + 1 : end, ...
-                        ds.info.currentBoot);
-                elseif strcmpi(ds.flags.priorType, 'gaussian')
-                    ds.params(si).gamma(ds.info.currentBoot) = ...
-                        ds.llOpt(si).prsHat(end, ds.info.currentBoot);
-                else
-                    % optional functionality
+                switch ds.flags.priorType
+					case 'loglinear'
+                    	ds.params(si).slopeHat(:, ds.info.currentBoot) = ...
+                        	ds.llOpt(si).prsHat(ds.info.nUniqueContrasts + 1 : end, ...
+                        	ds.info.currentBoot);
+                	case 'gaussian'
+                    	ds.params(si).gamma(ds.info.currentBoot) = ...
+                        	ds.llOpt(si).prsHat(end, ds.info.currentBoot);
+					case 'mixture'
+						ds.params(si).mixMean(:, ds.info.currentBoot) = ...
+							ds.llOpt(si).prsHat(ds.info.nUniqueContrasts + 1 : ...
+							ds.info.nUniqueContrasts + ds.mixInfo.nComponents, ...
+							ds.info.currentBoot);
+						ds.params(si).mixVar(:, ds.info.currentBoot) = ...
+							ds.llOpt(si).prsHat(ds.info.nUniqueContrasts + ...	
+							ds.mixInfo.nComponents + 1 : end, ds.info.currentBoot);
+					otherwise
+                    	% optional functionality
                 end
                 
                 % must include the speed-dependence of the likelihood

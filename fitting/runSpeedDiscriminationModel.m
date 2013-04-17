@@ -37,10 +37,10 @@ ds = getFitStatistics(ds);
 ds = fitLikelihoodFunction(ds);
 
 %% plot the fitted prior and likelihood widths
-ds = plotPriorFit(ds);
+%ds = plotPriorFit(ds);
 
 %% plot the actual distributions with parameters fitted by the model
-ds = plotFittedDistributions(ds);
+%ds = plotFittedDistributions(ds);
 
 %% plot fitted psychometric functions
 % ds = plotPsychometricFunctions(ds);

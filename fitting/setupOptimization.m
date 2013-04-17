@@ -14,59 +14,85 @@ for si = 1:ds.info.nSubjects
     % function handle to log-likelihood
     if ds.flags.fitLikeSpeed
         % optional functionality
-    elseif strcmpi(ds.flags.priorType, 'loglinear')
-        ds.llOpt(si).llFun = @(prs) (-loglike_loglinear(prs, ds));
-    elseif strcmpi(ds.flags.priorType, 'gaussian')
-        ds.llOpt(si).llFun = @(prs) (-loglike_gaussian(prs, ds));
-    else
-        error('runSpeedDiscriminationModel:setupOptimization:unknownPrior', ...
-            'The supported prior types are "loglinear" or "gaussian"');
+	else
+		switch ds.flags.priorType
+			case 'loglinear'
+        		ds.llOpt(si).llFun = @(prs) (loglike_loglinear(prs, ds));
+    		case 'gaussian'
+        		ds.llOpt(si).llFun = @(prs) (loglike_gaussian(prs, ds));
+			case 'mixture'
+				ds.llOpt(si).llFun = @(prs) (loglike_mixutre(prs, ds));
+    		otherwise
+        		error('runSpeedDiscriminationModel:setupOptimization:unknownPrior', ...
+            		'The supported prior types are "loglinear" or "gaussian"');
+		end
     end
     
     %% options to fmincon
-    if ds.info.nBoots == 1
-        ds.llOpt(si).options = ...
-            optimset('Algorithm', 'interior-point', 'Display', 'Iter', ...
-            'MaxFunEvals', 5000, 'MaxIter', 500, 'GradObj', 'off');
-    else
-        ds.llOpt(si).options = ...
-            optimset('Algorithm', 'interior-point', 'Display', 'off', ...
-            'MaxFunEvals', 5000, 'MaxIter', 500, 'GradObj', 'off');
-    end
+   	ds.llOpt(si).options = ...
+    	optimset('Algorithm', 'interior-point', 'Display', 'off', ...
+        'MaxFunEvals', 5000, 'MaxIter', 500, 'GradObj', 'off');
     
     %% initial values for likelihood widths and prior parameters
-    if strcmpi(ds.flags.priorType, 'loglinear')
-        % guesses and bounds to likelihood widths
-        % [1.3850 1.3290 1.2770 1.1118 0.9209 0.8631 0.7573]'		%% debugging an old simulation
-        likeGuess =  1 .* ones(ds.info.nUniqueContrasts, 1);
-        likeLB = .001 .* ones(ds.info.nUniqueContrasts, 1);
-        likeUB = 100 .* ones(ds.info.nUniqueContrasts, 1);
+	switch ds.flags.priorType
+		case 'loglinear'
+			% guesses and bounds to likelihood widths
+        	likeGuess =  1 .* ones(ds.info.nUniqueContrasts, 1);
+        	likeLB = .001 .* ones(ds.info.nUniqueContrasts, 1);
+        	likeUB = 100 .* ones(ds.info.nUniqueContrasts, 1);
         
-        % guesses and bounds to prior slopes
-        % [6.5 8.5 9 7.9 2 0.05]'		%% debugging an old simulation
-        priorGuess = 2 .* ones(ds.info.nUniqueRefVels, 1);
-        priorLB = -100 .* ones(ds.info.nUniqueRefVels, 1);
-        priorUB = 100 .* ones(ds.info.nUniqueRefVels, 1);
+        	% guesses and bounds to prior slopes
+        	priorGuess = 2 .* ones(ds.info.nUniqueRefVels, 1);
+        	priorLB = -100 .* ones(ds.info.nUniqueRefVels, 1);
+        	priorUB = 100 .* ones(ds.info.nUniqueRefVels, 1);
+
+			% mixture weights are empty
+			mixWeightsGuess = [];
+			mixWeightsLB = [];
+			mixWeightsUB = [];
         
-    elseif strcmpi(ds.flags.priorType, 'gaussian')
-        % guesses and bounds to likelihood widths
-        likeGuess = 1 .* ones(ds.info.nUniqueContrasts, 1);
-        likeLB = .001 .* ones(ds.info.nUniqueContrasts, 1);
-        likeUB = 100 .* ones(ds.info.nUniqueContrasts, 1);
+    	case 'gaussian'
+        	% guesses and bounds to likelihood widths
+        	likeGuess = 1 .* ones(ds.info.nUniqueContrasts, 1);
+        	likeLB = .001 .* ones(ds.info.nUniqueContrasts, 1);
+        	likeUB = 100 .* ones(ds.info.nUniqueContrasts, 1);
         
-        % guesses and bounds to prior variance
-        priorGuess = 10;
-        priorLB = 1e-5;
-        priorUB = 1e5;
+        	% guesses and bounds to prior variance
+        	priorGuess = 10;
+        	priorLB = 1e-5;
+        	priorUB = 1e5;
+
+			% mixture weights are empty
+			mixWeightsGuess = [];
+			mixWeightsLB = [];
+			mixWeightsUB = [];
         
-    else
-        % optional functionality
+    	case 'mixture'
+			% guesses and bounds to likelihood widths
+        	likeGuess = 1 .* ones(ds.info.nUniqueContrasts, 1);
+        	likeLB = .001 .* ones(ds.info.nUniqueContrasts, 1);
+        	likeUB = 100 .* ones(ds.info.nUniqueContrasts, 1);
+
+			% guesses and bounds to mixture means
+			priorGuess = [ds.mixInfo.mixMeans; ds.mixInfo.mixVars];
+			priorLB = [-1e2 .* ones(ds.mixInfo.nComponents, 1); ...
+					   1e-3 .* ones(ds.mixInfo.nComponents, 1)];
+			priorUB = [1e2 .* ones(ds.mixInfo.nComponents, 1); ...
+					   1e3 .* ones(ds.mixInfo.nComponents, 1)];
+
+			% mixture weights
+			mixWeightsGuess = ds.mixInfo.mixWeights;
+			mixWeightsLB = zeros(ds.mixInfo.nComponents, 1);
+			mixWeightsUB = ones(ds.mixInfo.nComponents, 1);
+        
+		otherwise
+        	% optional functionality
     end
     
     % organize the guesses
-    ds.llOpt(si).prs0 = [likeGuess; priorGuess];
-    ds.llOpt(si).LB = [likeLB; priorLB];
-    ds.llOpt(si).UB = [likeUB; priorUB];
+    ds.llOpt(si).prs0 = [likeGuess; priorGuess; mixWeightsGuess];
+    ds.llOpt(si).LB = [likeLB; priorLB; mixWeightsLB];
+    ds.llOpt(si).UB = [likeUB; priorUB; mixWeightsUB];
     
     
     %% setup fitting of functional form to likelihood widths

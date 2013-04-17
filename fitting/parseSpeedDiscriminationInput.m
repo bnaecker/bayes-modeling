@@ -26,7 +26,11 @@ args = struct(...
     'plotPMFs', true, ...
     'pmfFitType', 'normal', ...
     'normUnits', 'linear', ...
-    'nSEs', 2);
+    'nSEs', 2, ...
+	'mixInfo', struct('nComponents', 5, ...
+					  'mixMeans', linspace(0, 20, 5)', ...
+					  'mixVars', 5.*ones(5, 1), ...
+					  'mixWeights', (1/5).*ones(5, 1)));
 
 %% confirm that the input is parameter-value pairs
 assert(mod(nargin, 2) == 0, ...
@@ -42,6 +46,33 @@ end
 % prior type
 if any(strcmpi('priortype', varargin))
     args.priorType = varargin{find(strcmpi('priortype', varargin)) + 1};
+
+	% check for inputs describing the mixture of gaussians prior
+	if strcmpi(args.priorType, 'mixture')
+		% number of mixture components
+		if strcmpi('ncomponents', varargin)
+			args.mixtureInfo.nComponents = ...
+				varargin{find(strcmpi('ncomponents', varargin)) + 1};
+		end
+
+		% mixture means
+		if strcmpi('mixmeans', varargin)
+			args.mixtureInfo.mixMeans = ...
+				varargin{find(strcmpi('mixmeans', varargin)) + 1};
+		end
+
+		% mixture variances
+		if strcmpi('mixvars', varargin)
+			args.mixtureInfo.mixVars = ...
+				varargin{find(strcmpi('mixvars', varargin)) + 1};
+		end
+
+		% mixture weights
+		if strcmpi('mixweights', varargin)
+			args.mixtureInfo.mixWeights = ...
+				varargin{find(strcmpi('mixweights', varargin)) + 1};
+		end
+	end
 end
 
 % number of bootstraps

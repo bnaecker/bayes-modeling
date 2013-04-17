@@ -8,62 +8,85 @@ function ds = reconstructPrior(ds)
 % 
 % (c) bnaecker@stanford.edu 11 Nov 2012
 
+%% counters for the current subject and the current bootstrap iteration
+si = ds.info.currentSubject;
+bi = ds.info.currentBoot;
+
 %% get current velocities and define the correct speed axis
 if strcmp(ds.flags.normUnits, 'linear')
-    vels = ds.data(ds.info.currentSubject).refVels;
+    vels = ds.data(si).refVels;
     maxVel = max(vels) + 0.5 * max(vels);
     
     % set linear normalization units
     dx = 0.01;
-    ds.params(ds.info.currentSubject).interpAx = min(vels):dx:(maxVel + dx);
+    ds.params(si).interpAx = min(vels):dx:(maxVel + dx);
     
 else
-    vels = ds.data(ds.info.currentSubject).refVels;
+    vels = ds.data(si).refVels;
     maxVel = max(vels) + 0.1 * max(vels);
     
     % set logarithmic normalization units
     dx = 0.01;
-    ds.params(ds.info.currentSubject).interpAx = ...
+    ds.params(si).interpAx = ...
         ds.velTrans.transFun(dx : dx : (maxVel + dx));
 end
 
 %% normalize, by model
-if strcmp(ds.flags.priorType, 'loglinear');
+switch ds.flags.priorType
+case 'loglinear'
     % get the prior slopes returned by the minimization procedure
-    slopes = ds.params(ds.info.currentSubject).slopeHat(:, ds.info.currentBoot);
+    slopes = ds.params(si).slopeHat(:, bi);
     
     % interpolate the slopes for the normalization
-    ySlopes = interp1(vels, slopes, ds.params(ds.info.currentSubject).interpAx, ...
+    ySlopes = interp1(vels, slopes, ds.params(si).interpAx, ...
         'linear', 'extrap');
     
     % integrate the slopes and normalize the resulting distribution itself
     yCumulative = cumsum(ySlopes) * dx;
     prior = exp(-yCumulative);
-    ds.params(ds.info.currentSubject).interpPrior(:, ds.info.currentBoot) = ...
+    ds.params(si).interpPrior(:, bi) = ...
         prior ./ (sum(prior) * dx);
     
     % interp1 is used to pick the slopes from the normalized distribution
     % at the values of the reference velocities
-    ds.params(ds.info.currentSubject).prior(:, ds.info.currentBoot) = ...
-        interp1(ds.params(ds.info.currentSubject).interpAx, ...
-        ds.params(ds.info.currentSubject).interpPrior(:, ds.info.currentBoot), ...
+    ds.params(si).prior(:, bi) = ...
+        interp1(ds.params(si).interpAx, ...
+        ds.params(si).interpPrior(:, bi), ...
         vels, 'linear');
     
-elseif strcmp(ds.flags.priorType, 'gaussian')
+case 'gaussian'
     % compute the normal distribution function with fitted variance
-    pp = normpdf(ds.params(ds.info.currentSubject).interpAx, 0, ...
-        ds.params(ds.info.currentSubject).gamma(ds.info.currentBoot) ^ 2);
+    pp = normpdf(ds.params(si).interpAx, 0, ...
+        ds.params(si).gamma(bi) ^ 2);
     
     % normalize
-    ds.params(ds.info.currentSubject).interpPrior(:, ds.info.currentBoot) = ...
+    ds.params(si).interpPrior(:, bi) = ...
         pp ./ (sum(pp) * dx);
     
     % use interp1 to pick out the values of the distribution at the
     % reference velocities
-    ds.params(ds.info.currentSubject).prior(:, ds.info.currentBoot) = ...
-        interp1(ds.params(ds.info.currentSubject).interpAx, ...
-        ds.params(ds.info.currentSubject).interpPrior(:, ds.info.currentBoot), vels);
-    
-else 
+    ds.params(si).prior(:, bi) = ...
+        interp1(ds.params(si).interpAx, ...
+        ds.params(si).interpPrior(:, bi), vels);
+
+case 'mixture'
+	% compute mixture distribution, individual components summed 
+	pp = sum(normpdf(ds.params(si).interpAx' * ...
+		ones(1,ds.mixInfo.nComponents), ...
+		ones(length(ds.params(si).interpAx, 1), 1) * ...
+		ds.params(si).mixMeans, ...
+		ones(length(ds.params(si).interpAx, 1), 1) * ...
+		ds.params(si).mixMeans), 2);
+
+	% normalize
+	ds.params(si).interpPrior(:, bi) = ...
+		pp ./ (sum(pp) * dx);
+
+	% use interp1 to pick out the values of the distribution at the reference velocities
+	ds.params(si).prior(:, bi) = ...
+		interp1(ds.params(si).interpAx, ...
+		ds.params(si).interpPrior(:, bi), vels);
+
+otherwise 
     % optional functionality
 end
