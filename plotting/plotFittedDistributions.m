@@ -31,14 +31,14 @@ for si = 1:ds.info.nSubjects
         'subject ' num2str(si) ext]);
     
     % transform speed back to linear axis
-    if ds.info.isSimData
+    if ~ds.info.isSimData
         ax = ds.params(si).interpAx;
         vels = ds.data(si).refVels;
     else
         ax = ds.velTrans.iTransFun(ds.params(si).interpAx);
         vels = ds.velTrans.iTransFun(ds.data(si).refVels);
     end
-    mx = 15; % max deg/s to plot
+    mx = 5; % max deg/s to plot
     plotInds = ax < mx;
     ax = ax(plotInds);
     
@@ -64,13 +64,13 @@ for si = 1:ds.info.nSubjects
             ll = normpdf(ax, vels(vi), ds.params(si).likeWidth(ci, 1))';
             ll = ll ./ (sum(ll) * dx);
             ds.handles(si).likeDists(vi, ci, 1) = plot(ax, ll, ...
-                'LineWidth', 1.5, 'Marker', 'none', 'Color', [0.8 0.1 0.1]);
+                'LineWidth', 1, 'Marker', 'none', 'Color', [0.8 0.1 0.1]);
             
             % posterior
             post = ds.params(si).interpPrior(plotInds, 1) .* ll;
             post = post ./ (sum(post) * dx);
             ds.handles(si).postDists(vi, ci, 1) = plot(ax, post(plotInds), ...
-                'LineWidth', 1.5, 'LineStyle', '--', 'Color', [0.2 0.2 0.6]);
+                'LineWidth', 1, 'LineStyle', '--', 'Color', [0.2 0.2 0.6]);
         end
         
         % pretty up the axes
@@ -121,7 +121,7 @@ for si = 1:ds.info.nSubjects
         % pretty up the axes
         set(ds.handles(si).distAx(ci, 2), 'TickDir', 'out', 'TickLength', [.003 .003], ...
             'FontSize', 12, 'FontWeight', 'bold', ...
-            'XScale', 'log', 'YScale', 'log', ...
+            'XScale', 'linear', 'YScale', 'log', ...
             'XLim', [1e-1 mx + 0.2 * mx], 'YLim', [1e-20 1e2]);
         
         % labels and title

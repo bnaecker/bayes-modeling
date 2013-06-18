@@ -19,7 +19,7 @@ if strcmp(ds.flags.normUnits, 'linear')
     
     % set linear normalization units
     dx = 0.01;
-    ds.params(si).interpAx = min(vels):dx:(maxVel + dx);
+    ds.params(si).interpAx = dx:dx:(maxVel + dx);
     
 else
     vels = ds.data(si).refVels;
@@ -38,8 +38,11 @@ case 'loglinear'
     slopes = ds.params(si).slopeHat(:, bi);
     
     % interpolate the slopes for the normalization
-    ySlopes = interp1(vels, slopes, ds.params(si).interpAx, ...
-        'linear', 'extrap');
+    ySlopes = [interp1(vels, slopes, ds.params(si).interpAx(ds.params(si).interpAx < vels(1)), ...
+		'linear', slopes(1)) ...
+	interp1(vels, slopes, ds.params(si).interpAx(ds.params(si).interpAx >= vels(1) & ...
+		ds.params(si).interpAx <= vels(end)), 'linear') interp1(vels, slopes, ...
+		ds.params(si).interpAx(ds.params(si).interpAx > vels(end)), 'linear', slopes(end))];
     
     % integrate the slopes and normalize the resulting distribution itself
     yCumulative = cumsum(ySlopes) * dx;

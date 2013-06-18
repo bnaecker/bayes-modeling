@@ -144,5 +144,5 @@ sim.T(swp) = ~sim.T(swp);
 % notify
 fprintf('done.\nSaving ... ');
 m = [sim.v1 sim.c1 sim.v2 sim.c2 nan(sim.nTrials, 4) sim.T nan(sim.nTrials, 2)];
-save(['../Data/simData_' sim.priorType '.mat'], 'm');
+save(['../../data/simData_' sim.priorType '.mat'], 'm');
 fprintf('done.\n');
