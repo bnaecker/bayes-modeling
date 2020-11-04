@@ -33,14 +33,7 @@ ds = struct(...
 fprintf('\nFinding files and loading data ... ');
 
 % set paths
-oldPwd = pwd;
-cd('../../');
-ds.info.baseDir = pwd;
-addpath('code/fitting/');
-addpath('code/plotting/');
-addpath('code/testScripts/');
-addpath('data/');
-cd(oldPwd)
+ds = setPaths(ds);
 
 % set directory names
 ds.info.dataDir = fullfile(ds.info.baseDir, 'data');
@@ -90,7 +83,11 @@ ds.info.correctCol = 11;    % correct choice
 
 %% save default or user-defined information about mixture of gaussians model
 if strcmp(args.priorType, 'mixture')
-	ds.mixInfo = args.mixInfo;
+	ds.mixInfo = struct(...
+		'nComponents', args.nComponents, ...
+		'mixMeans', linspace(0, 20, args.nComponents)', ...
+		'mixVars', 5 .* ones(args.nComponents, 1), ...
+		'mixWeights', (1 / args.nComponents) .* ones(args.nComponents, 1));
 else
 	ds.mixInfo = [];
 end

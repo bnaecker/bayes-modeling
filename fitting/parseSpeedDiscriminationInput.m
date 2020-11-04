@@ -11,126 +11,46 @@ function args = parseSpeedDiscriminationInput(varargin)
 %               parameter values.
 %
 % (c) bnaecker@stanford.edu 11 Nov 2012
+% 2017-01-11 - update to use inputParser
 
-%% define 'args' structure, with default arguments
-args = struct(...
-    'nSubjects', 1, ...
-    'priorType', 'loglinear', ...
-    'nBoots', 5, ...
-    'plotStraps', false, ...
-    'plotSmears', true, ...
-    'fitLikeFun', true, ...
-    'fitRates', true, ...
-    'fitPriorFun', false, ...
-    'fitLikeSpeed', false, ...
-    'plotPMFs', true, ...
-    'pmfFitType', 'normal', ...
-    'normUnits', 'linear', ...
-    'nSEs', 2, ...
-	'mixInfo', struct('nComponents', 5, ...
-					  'mixMeans', linspace(0, 20, 5)', ...
-					  'mixVars', 5.*ones(5, 1), ...
-					  'mixWeights', (1/5).*ones(5, 1)));
+parser = inputParser();
+arguments = struct( ...
+	'nSubjects', ...	% Number of subjects used
+		{{1, @(x) x > 0}}, ...
+	'priorType', ...	% Functional form of prior to be fitted
+		{{'loglinear', @(x) ischar(x) && (any(strcmp(x, {'loglinear', 'gaussian', 'mixture'})))}}, ...
+	'nBoots', ...		% Number of bootstrap iterations on fitting procedure
+		{{5, @(x) x > 0}}, ...
+	'plotStraps', ...	% Plot each individual bootstrap, where appropriate
+		{{false, @(x) islogical(x)}}, ...
+	'plotSmears', ...	% Plot polygons showing errors, instead of individual bootstraps
+		{{true, @(x) islogical(x)}}, ...
+	'fitLikeFun', ...	% Fit functional form to contrast-dependence of likelihood function
+		{{true, @(x) islogical(x)}}, ...
+	'fitRates', ...		% Include maximum firing rate in functional form of likelihood
+		{{true, @(x) islogical(x)}}, ...
+	'fitLikeSpeed', ...	% Fit speed-dependence of likelihoods
+		{{false, @(x) islogical(x)}}, ...
+	'plotPMFs', ...		% Plot psychometric functions
+		{{true, @(x) islogical(x)}}, ...
+	'pmfFitType', ...	% Type of function used to fit PMFs
+		{{'normal', @(x) ischar(x) && (any(strcmp(x, {'normal', 'weibull'})))}}, ...
+	'normUnits', ...	% Units used when normalizing the prior distribution
+		{{'linear', @(x) ischar(x) && (any(strcmp(x, {'linear', 'log'})))}}, ...
+	'nSEs', ...			% Number of standard errors to plot
+		{{2, @(x) x >= 0.}}, ...
+	'nPmfSamples', ...	% Number of samples drawn at each velocity when fitting PMFs
+		{{100, @(x) x > 0}}, ...
+	'nComponents', ...	% Number of mixture components
+		{{5, @(x) x >= 1}});
 
-%% confirm that the input is parameter-value pairs
-assert(mod(nargin, 2) == 0, ...
-    'runSpeedDiscriminationModel:parseSpeedDiscriminationInput:paramValuePairs', ...
-    'Input arguments should be in parameter-value pairs');
-
-%% get the parameter values
-% number of subjects
-if any(strcmpi('nsubjects', varargin))
-    args.nSubjects = varargin{find(strcmpi('nsubjects', varargin)) + 1};
+argnames = fieldnames(arguments);
+for i = 1:length(argnames)
+	parser.addOptional(argnames{i}, ...
+		arguments.(argnames{i}){1}, ... % default value
+		arguments.(argnames{i}){2}); 	% validator function
 end
 
-% prior type
-if any(strcmpi('priortype', varargin))
-    args.priorType = varargin{find(strcmpi('priortype', varargin)) + 1};
-
-	% check for inputs describing the mixture of gaussians prior
-	if strcmpi(args.priorType, 'mixture')
-		% number of mixture components
-		if strcmpi('ncomponents', varargin)
-			args.mixtureInfo.nComponents = ...
-				varargin{find(strcmpi('ncomponents', varargin)) + 1};
-		end
-
-		% mixture means
-		if strcmpi('mixmeans', varargin)
-			args.mixtureInfo.mixMeans = ...
-				varargin{find(strcmpi('mixmeans', varargin)) + 1};
-		end
-
-		% mixture variances
-		if strcmpi('mixvars', varargin)
-			args.mixtureInfo.mixVars = ...
-				varargin{find(strcmpi('mixvars', varargin)) + 1};
-		end
-
-		% mixture weights
-		if strcmpi('mixweights', varargin)
-			args.mixtureInfo.mixWeights = ...
-				varargin{find(strcmpi('mixweights', varargin)) + 1};
-		end
-	end
-end
-
-% number of bootstraps
-if any(strcmpi('nboots', varargin))
-    args.nBoots = varargin{find(strcmpi('nboots', varargin)) + 1};
-end
-
-% flag to plot the bootstraps themselves
-if any(strcmpi('plotstraps', varargin))
-    args.plotStraps = varargin{find(strcmpi('plotstraps', varargin)) + 1};
-end
-
-% plot standard errors as smears
-if any(strcmpi('plotsmears', varargin))
-    args.plotSmears = varargin{find(strcmpi('plotsmears', varargin)) + 1};
-end
-
-% fit functional form to the contrast-dependence of the likelihood
-if any(strcmpi('fitlikefun', varargin))
-    args.fitLikeFun = varargin{find(strcmpi('fitlikefun', varargin)) + 1};
-end
-
-% include the maximum firing rate of the likelihood as a parameter to be fit
-if any(strcmpi('fitrates', varargin))
-    args.fitRates = varargin{find(strcmpi('fitrates', varargin)) + 1};
-end
-
-%%% NOTE: Although I have included logical statements throughout the code
-%%% for fitting both a functional form to the prior and the
-%%% speed-dependence of the likelihood function, my code does not actually
-%%% do so.
-
-% fit a functional form to the prior itself
-if any(strcmpi('fitpriorfun', varargin))
-    args.fitPriorFun = varargin{find(strcmpi('fitpriorfun', varargin)) + 1};
-end
-
-% fit speed-dependence of likelihood function
-if any(strcmpi('fitlikespeed', varargin))
-    args.fitLikeSpeed = varargin{find(strcmpi('fitlikespeed', varargin)) + 1};
-end
-
-% plot psychometric functions
-if any(strcmpi('plotpmfs', varargin))
-    args.plotPMFs = varargin{find(strcmpi('plotpmfs', varargin)) + 1};
-end
-
-% functional form of the fitted psychometric functions
-if any(strcmpi('pmffittype', varargin))
-    args.pmfFitType = varargin{find(strcmpi('pmffittype', varargin)) + 1};
-end
-
-% units used to normalize the prior distribution
-if any(strcmpi('normunits', varargin))
-    args.normUnits = varargin{find(strcmpi('normunits', varargin)) + 1};
-end
-
-% number of standard errors included in the plots
-if any(strcmpi('nses', varargin))
-    args.nSEs = varargin{find(strcmpi('nses', varargin)) + 1};
-end
+% Parse
+parser.parse(varargin{:});
+args = parser.Results;

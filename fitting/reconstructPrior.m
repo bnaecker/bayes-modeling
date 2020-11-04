@@ -18,17 +18,19 @@ if strcmp(ds.flags.normUnits, 'linear')
     maxVel = max(vels) + 0.5 * max(vels);
     
     % set linear normalization units
-    dx = 0.01;
-    ds.params(si).interpAx = dx:dx:(maxVel + dx);
+    ds.params(si).priorDx = 0.01;
+    ds.params(si).interpAx = ...
+		ds.params(si).priorDx:ds.params(si).priorDx:(maxVel + ds.params(si).priorDx);
     
 else
     vels = ds.data(si).refVels;
     maxVel = max(vels) + 0.1 * max(vels);
     
     % set logarithmic normalization units
-    dx = 0.01;
+    ds.params(si).priorDx = 0.01;
     ds.params(si).interpAx = ...
-        ds.velTrans.transFun(dx : dx : (maxVel + dx));
+        ds.velTrans.transFun(ds.params(si).priorDx : ...
+		ds.params(si).priorDx : (maxVel + ds.params(si).priorDx));
 end
 
 %% normalize, by model
@@ -45,10 +47,10 @@ case 'loglinear'
 		ds.params(si).interpAx(ds.params(si).interpAx > vels(end)), 'linear', slopes(end))];
     
     % integrate the slopes and normalize the resulting distribution itself
-    yCumulative = cumsum(ySlopes) * dx;
+    yCumulative = cumsum(ySlopes) * ds.params(si).priorDx;
     prior = exp(-yCumulative);
     ds.params(si).interpPrior(:, bi) = ...
-        prior ./ (sum(prior) * dx);
+        prior ./ (sum(prior) * ds.params(si).priorDx);
     
     % interp1 is used to pick the slopes from the normalized distribution
     % at the values of the reference velocities
@@ -64,7 +66,7 @@ case 'gaussian'
     
     % normalize
     ds.params(si).interpPrior(:, bi) = ...
-        pp ./ (sum(pp) * dx);
+        pp ./ (sum(pp) * ds.params(si).priorDx);
     
     % use interp1 to pick out the values of the distribution at the
     % reference velocities
@@ -83,7 +85,7 @@ case 'mixture'
 
 	% normalize
 	ds.params(si).interpPrior(:, bi) = ...
-		pp ./ (sum(pp) * dx);
+		pp ./ (sum(pp) * ds.params(si).priorDx);
 
 	% use interp1 to pick out the values of the distribution at the reference velocities
 	ds.params(si).prior(:, bi) = ...

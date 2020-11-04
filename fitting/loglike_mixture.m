@@ -44,17 +44,20 @@ testSig = sigVals(ds.data(si).testCInds);
 % preallocate
 refAlpha = zeros(ds.mixInfo.nComponents, ds.info.nTrials);
 testAlpha = refAlpha;
-muRef = refAlpha;
-muTest = refAlpha;
-wRef = refAlpha;
-wTest = refAlpha;
+refMu = refAlpha;
+testMu = refAlpha;
+refW = refAlpha;
+testW = refAlpha;
 
 % loop over components, computing the required values
 for ci = 1:ds.mixInfo.nComponents
-	refAlpha(ci, :) = (1 ./ (refSig + gamma(ci))) .* gamma(ci);
-	testAlpha(ci, :) = (1 ./ (testSig + gamma(ci))) .* gamma(ci);
-	muRef(ci, :) = refAlpha(ci, :) .* mu(ci);
-	muTest(ci, :) = testAlpha(ci, :) .* mu(ci);
+	refAlpha(ci, :) = (gamma(ci)^2 ./ (refSig^2 + gamma(ci)^2));
+	testAlpha(ci, :) = (gamma(ci)^2 ./ (testSig^2 + gamma(ci)^2));
+	refMu(ci, :) = (refSig^2 / (refSig^2 + gamma(ci)^2)) * mu(ci);
+	testMu(ci, :) = (testSig^2 / (testSig^2 + gamma(ci)^2)) * mu(ci);
+	refV = (w(ci) / sqrt(gamma(ci)^2 + refSig^2)) * normpdf( (m - refMu(ci, :)) / sqrt(gamma(ci)^2 + refSig^2));
+	testV = (w(ci) / sqrt(gamma(ci)^2 + testSig^2)) * normpdf( (m - testMu(ci, :)) / sqrt(gamma(ci)^2 + testSig^2));
+
 	%wRef(ci, :) = (w(ci) .* sqrt(gamma(ci)^2 + refSig.^2)) .* ...
 		%normpdf(
 	%% PROBLEM! WE DON'T HAVE M!
@@ -62,3 +65,4 @@ end
 
 % compute modified means, for reference and test velocities, on each trial
 for ci = 1:ds
+end
